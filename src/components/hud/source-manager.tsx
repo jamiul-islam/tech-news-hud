@@ -27,7 +27,7 @@ export const SourceManager = () => {
   const upsertSource = useAppStore((state) => state.upsertSource);
   const removeSource = useAppStore((state) => state.removeSource);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!value.trim()) return;
 
@@ -46,16 +46,42 @@ export const SourceManager = () => {
       displayName = normalized.replace(/^https?:\/\//, '').replace(/^@/, '');
     }
 
-    upsertSource({
-      id,
-      type: activeTab,
-      displayName,
-      url: activeTab === 'rss' ? normalized : undefined,
-      handle: activeTab === 'twitter' ? normalized : undefined,
-      status: 'queued',
-    });
+    // Optimistic UI
+    upsertSource({ id, type: activeTab, displayName, url: activeTab === 'rss' ? normalized : undefined, handle: activeTab === 'twitter' ? normalized : undefined, status: 'queued' });
 
-    setValue('');
+    try {
+      const res = await fetch('/api/sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: activeTab,
+          url: activeTab === 'rss' ? normalized : undefined,
+          handle: activeTab === 'twitter' ? normalized : undefined,
+          displayName,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to add source');
+      }
+      const data = await res.json();
+      if (data?.source?.id) {
+        upsertSource({
+          id: data.source.id,
+          type: activeTab,
+          displayName: data.source.display_name ?? displayName,
+          url: data.source.url ?? undefined,
+          handle: data.source.handle ?? undefined,
+          status: data.source.status ?? 'idle',
+          lastPolledAt: data.source.last_polled_at ?? undefined,
+        });
+      }
+    } catch (err) {
+      // revert optimistic on error
+      removeSource(id);
+      console.warn('Add source failed', err);
+    } finally {
+      setValue('');
+    }
   };
 
   return (

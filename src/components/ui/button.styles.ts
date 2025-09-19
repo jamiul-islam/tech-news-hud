@@ -8,7 +8,7 @@ const baseClasses =
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[#0F0F0F] text-[#F8F8F8] hover:bg-[#1d1d1d] dark:bg-[#F8F8F8] dark:text-[#0F0F0F] dark:hover:bg-[#e6e6e6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4C7EFF] transition-colors',
+    'bg-[#4C7EFF] text-white hover:bg-[#3d69e0] dark:bg-[#4C7EFF] dark:text-white dark:hover:bg-[#3d69e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4C7EFF] transition-colors',
   secondary:
     'bg-transparent border border-[#1f1f1f]/20 dark:border-[#f1f1f1]/20 text-[#0F0F0F] dark:text-[#F8F8F8] hover:bg-[#f5f5f5] dark:hover:bg-[#1a1a1a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4C7EFF]',
   ghost:

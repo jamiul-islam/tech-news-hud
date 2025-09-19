@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
+import type { SourceStatus } from '@/types/hud';
 import { AutoScrollBanner } from './auto-scroll-banner';
 import { SourceManager } from './source-manager';
 import { FeedStream } from './feed-stream';
@@ -124,23 +125,70 @@ export const HudRoot = () => {
   const focusMixLabel = `${Math.round(focusWeight * 100)}% focus · ${Math.round((1 - focusWeight) * 100)}% signal`;
 
   useEffect(() => {
-    if (sources.length === 0) {
-      setSourcesStatus('loading');
-      setTimeout(() => {
-        setSources(demoSources);
-        setSourcesStatus('success');
-        setFeedItems(demoItems);
-        setFeedStatus('success');
-        setBookmarkEntries(
-          demoItems
-            .filter((item) => item.isBookmarked)
-            .map((item) => ({
-              itemId: item.id,
-              bookmarkedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-            })),
-        );
-      }, 1200);
+    async function bootstrap() {
+      if (sources.length === 0) {
+        setSourcesStatus('loading');
+        // Try to pull sources from API (requires auth). Fallback to demo.
+        try {
+          const res = await fetch('/api/sources', { cache: 'no-store' });
+          if (res.ok) {
+            const data: { sources?: Array<{ id: string; type: 'rss' | 'twitter'; display_name?: string | null; url?: string | null; handle?: string | null; status?: string | null; last_polled_at?: string | null }> } = await res.json();
+            if (Array.isArray(data.sources) && data.sources.length > 0) {
+              const validStatuses: ReadonlyArray<SourceStatus> = ['idle', 'queued', 'fetching', 'error'];
+              setSources(
+                data.sources.map((s) => {
+                  const maybeStatus = (s.status ?? 'idle') as SourceStatus | string;
+                  const status: SourceStatus = validStatuses.includes(maybeStatus as SourceStatus)
+                    ? (maybeStatus as SourceStatus)
+                    : 'idle';
+                  return {
+                   id: s.id,
+                   type: s.type,
+                   displayName: s.display_name ?? 'Source',
+                   url: s.url ?? undefined,
+                   handle: s.handle ?? undefined,
+                    status,
+                   lastPolledAt: s.last_polled_at ?? undefined,
+                  };
+                }),
+              );
+              setSourcesStatus('success');
+              // Fetch feed for these sources
+              setFeedStatus('loading');
+              const feedRes = await fetch('/api/feed?limit=30', { cache: 'no-store' });
+              if (feedRes.ok) {
+                const feed = await feedRes.json();
+                setFeedItems(feed.items ?? []);
+                setFeedStatus('success');
+                return;
+              }
+            }
+            // If authenticated but no sources, show empty state (do not fallback)
+            setSourcesStatus('success');
+            setFeedStatus('success');
+            return;
+          }
+        } catch {
+          // ignore and fall back to demo below
+        }
+        // Demo fallback
+        setTimeout(() => {
+          setSources(demoSources);
+          setSourcesStatus('success');
+          setFeedItems(demoItems);
+          setFeedStatus('success');
+          setBookmarkEntries(
+            demoItems
+              .filter((item) => item.isBookmarked)
+              .map((item) => ({
+                itemId: item.id,
+                bookmarkedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+              })),
+          );
+        }, 800);
+      }
     }
+    bootstrap();
   }, [setFeedItems, setFeedStatus, setSources, setSourcesStatus, setBookmarkEntries, sources.length]);
 
   return (
