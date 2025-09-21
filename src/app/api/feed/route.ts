@@ -2,6 +2,10 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
+type CacheEntry = { timestamp: number; payload: { items: unknown[]; nextCursor: string | null } };
+const FEED_CACHE = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 30_000;
+
 type ItemRow = {
   id: string;
   source_id: string;
@@ -17,6 +21,7 @@ type ItemRow = {
 const QuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
   before: z.string().optional(), // ISO timestamp cursor
+  mixRatio: z.coerce.number().min(0).max(1).default(0.7).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -29,12 +34,18 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: 'Invalid query' }, { status: 400 });
   }
 
-  const { limit, before } = parsed.data;
+  const { limit, before, mixRatio } = parsed.data;
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const cacheKey = `${user.id}:${limit}:${before ?? 'root'}:${(mixRatio ?? 0.7).toFixed(2)}`;
+  const cached = FEED_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return Response.json(cached.payload);
+  }
 
   let query = supabase
     .from('items')
@@ -50,6 +61,9 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
+  const focusBlend = mixRatio ?? 0.7;
+  const popBlend = 1 - focusBlend;
+
   const mapped = ((data as ItemRow[] | null) ?? []).map((row) => {
     const focusTopics: string[] = Array.isArray(row.focus_topics) ? (row.focus_topics as string[]) : [];
     const md = (row.metadata ?? {}) as Record<string, unknown>;
@@ -57,7 +71,7 @@ export async function GET(req: NextRequest) {
     const popVal = md['popularity'];
     if (typeof popVal === 'number') popularity = popVal as number;
     const focusScore = focusTopics.length > 0 ? 0.7 : 0.4;
-    const finalScore = 0.7 * focusScore + 0.3 * popularity;
+    const finalScore = focusBlend * focusScore + popBlend * popularity;
     return {
       id: row.id,
       title: row.title,
@@ -75,5 +89,7 @@ export async function GET(req: NextRequest) {
   });
 
   const nextCursor = mapped.length === limit ? mapped[mapped.length - 1].publishedAt : null;
-  return Response.json({ items: mapped, nextCursor });
+  const payload = { items: mapped, nextCursor };
+  FEED_CACHE.set(cacheKey, { timestamp: Date.now(), payload });
+  return Response.json(payload);
 }

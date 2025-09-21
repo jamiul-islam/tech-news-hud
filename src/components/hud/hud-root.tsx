@@ -211,7 +211,7 @@ type BookmarkRow = {
               setSourcesStatus('success');
               // Fetch feed for these sources
               setFeedStatus('loading');
-              const feedRes = await fetch('/api/feed?limit=30', { cache: 'no-store' });
+              const feedRes = await fetch(`/api/feed?limit=30&mixRatio=${focusWeight.toFixed(2)}`, { cache: 'no-store' });
               if (feedRes.ok) {
                 const feed = await feedRes.json();
                 setFeedItems(feed.items ?? []);
@@ -247,7 +247,7 @@ type BookmarkRow = {
       }
     }
     bootstrap();
-  }, [fetchAccountData, setFeedItems, setFeedStatus, setSources, setSourcesStatus, setBookmarkEntries, sources.length]);
+  }, [fetchAccountData, focusWeight, setFeedItems, setFeedStatus, setSources, setSourcesStatus, setBookmarkEntries, sources.length]);
 
   return (
     <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-10">

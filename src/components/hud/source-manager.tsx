@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import type { SourceType } from '@/types/hud';
+import { pushToast } from '@/store/toast-store';
 
 const tabs: Array<{ key: SourceType; label: string; placeholder: string }> = [
   {
@@ -28,11 +29,12 @@ export const SourceManager = () => {
   const removeSource = useAppStore((state) => state.removeSource);
   const setFeedItems = useAppStore((state) => state.setFeedItems);
   const setFeedStatus = useAppStore((state) => state.setFeedStatus);
+  const focusWeight = useAppStore((state) => state.preferences.focusWeight);
 
   const refreshFeed = async () => {
     try {
       setFeedStatus('loading');
-      const res = await fetch('/api/feed?limit=50', { cache: 'no-store' });
+      const res = await fetch(`/api/feed?limit=50&mixRatio=${focusWeight.toFixed(2)}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load feed');
       const data = await res.json();
       setFeedItems(data.items ?? []);
@@ -50,10 +52,12 @@ export const SourceManager = () => {
       const res = await fetch(`/api/sources/${sourceId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete source');
       await refreshFeed();
+      pushToast('Source removed.', 'info');
     } catch (err) {
       if (existing) {
         upsertSource(existing);
       }
+      pushToast('Failed to remove source.', 'error');
       console.warn('Remove source failed', err);
     }
   };
@@ -110,9 +114,11 @@ export const SourceManager = () => {
       setTimeout(() => {
         refreshFeed();
       }, 2500);
+      pushToast('Source added. Fetching latest stories…', 'success');
     } catch (err) {
       // revert optimistic on error
       removeSource(id);
+      pushToast('Could not add that source. Please check the URL/handle.', 'error');
       console.warn('Add source failed', err);
     } finally {
       setValue('');

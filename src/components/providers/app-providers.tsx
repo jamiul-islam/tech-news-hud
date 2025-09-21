@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { ToastViewport } from '@/components/ui/toast-viewport';
 
 type Props = {
   children: ReactNode;
@@ -60,5 +61,10 @@ export const AppProviders = ({ children }: Props) => {
     }
   }, [theme]);
 
-  return <>{children}</>;
+  return (
+    <>
+      <ToastViewport />
+      {children}
+    </>
+  );
 };

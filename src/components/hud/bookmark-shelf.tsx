@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { pushToast } from '@/store/toast-store';
 import { formatDistanceToNow } from '@/lib/utils/time';
 
 export const BookmarkShelf = () => {
@@ -51,7 +52,10 @@ export const BookmarkShelf = () => {
           variant="ghost"
           size="sm"
           className="text-xs text-[#0F0F0F]/60 hover:text-[#4C7EFF] dark:text-[#F8F8F8]/60"
-          onClick={() => setLastSnoozedAt(new Date().toISOString())}
+          onClick={() => {
+            setLastSnoozedAt(new Date().toISOString());
+            pushToast('Bookmarks snoozed for 2 hours', 'info');
+          }}
         >
           Snooze 2h
         </Button>
@@ -77,7 +81,15 @@ export const BookmarkShelf = () => {
                   variant="ghost"
                   size="sm"
                   className="px-2 text-xs"
-                  onClick={() => removeBookmark(bookmark.itemId)}
+                  onClick={async () => {
+                    removeBookmark(bookmark.itemId);
+                    try {
+                      await fetch(`/api/bookmarks/${bookmark.itemId}`, { method: 'DELETE' });
+                      pushToast('Bookmark removed', 'info');
+                    } catch {
+                      pushToast('Bookmark removal failed', 'error');
+                    }
+                  }}
                 >
                   Remove
                 </Button>

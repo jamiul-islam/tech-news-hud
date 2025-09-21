@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { pushToast } from '@/store/toast-store';
 import { Card } from '@/components/ui/card';
 import { formatDistanceToNow } from '@/lib/utils/time';
 
@@ -52,14 +53,18 @@ export const FeedStream = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: target.id }),
         });
+        pushToast('Saved to bookmarks', 'success');
       } catch (error) {
+        pushToast('Bookmark failed to save', 'error');
         console.warn('Failed to save bookmark', error);
       }
     } else {
       removeBookmark(target.id);
       try {
         await fetch(`/api/bookmarks/${target.id}`, { method: 'DELETE' });
+        pushToast('Bookmark removed', 'info');
       } catch (error) {
+        pushToast('Bookmark removal failed', 'error');
         console.warn('Failed to delete bookmark', error);
       }
     }
