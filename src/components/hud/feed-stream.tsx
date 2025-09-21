@@ -14,6 +14,14 @@ const EmptyFeed = () => (
   </div>
 );
 
+const formatCount = (value?: number) => {
+  if (!value || value < 0) return undefined;
+  if (value < 1000) return value.toString();
+  if (value < 10_000) return `${(value / 1000).toFixed(1)}K`;
+  if (value < 1_000_000) return `${Math.round(value / 1000)}K`;
+  return `${(value / 1_000_000).toFixed(1)}M`;
+};
+
 export const FeedStream = () => {
   const items = useAppStore((state) => state.feed.items);
   const status = useAppStore((state) => state.feed.status);
@@ -98,6 +106,11 @@ export const FeedStream = () => {
                   <Badge tone="outline" className="uppercase tracking-[0.25em] text-[10px]">
                     {item.sourceName}
                   </Badge>
+                  {item.sourceHandle && (
+                    <Badge tone="outline" className="text-[11px] font-medium">
+                      {item.sourceHandle}
+                    </Badge>
+                  )}
                   {item.publishedAt && (
                     <span className="text-xs text-[#0F0F0F]/50 dark:text-[#F8F8F8]/50">
                       {formatDistanceToNow(item.publishedAt)} ago
@@ -130,6 +143,22 @@ export const FeedStream = () => {
                     #{topic}
                   </Badge>
                 ))}
+                {item.sourceType === 'twitter' && item.tweetMetrics && (
+                  <>
+                    {item.tweetMetrics.likeCount && (
+                      <Badge tone="outline">Likes {formatCount(item.tweetMetrics.likeCount)}</Badge>
+                    )}
+                    {item.tweetMetrics.retweetCount && (
+                      <Badge tone="outline">Reposts {formatCount(item.tweetMetrics.retweetCount)}</Badge>
+                    )}
+                    {item.tweetMetrics.replyCount && (
+                      <Badge tone="outline">Replies {formatCount(item.tweetMetrics.replyCount)}</Badge>
+                    )}
+                    {item.tweetMetrics.quoteCount && (
+                      <Badge tone="outline">Quotes {formatCount(item.tweetMetrics.quoteCount)}</Badge>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 

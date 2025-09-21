@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getAdminSupabase } from '@/lib/supabase/admin-client';
+import { formatTwitterHandle, normalizeTwitterHandle } from '@/lib/utils/twitter';
 
 type SourceRow = {
   id: string;
@@ -70,25 +71,41 @@ export async function POST(req: NextRequest) {
 
   // Infer type if not provided
   const resolvedType: 'rss' | 'twitter' = type ?? (url ? 'rss' : 'twitter');
+
+  let normalizedHandle: string | null = null;
+  if (resolvedType === 'twitter') {
+    normalizedHandle = normalizeTwitterHandle(handle ?? '');
+    if (!normalizedHandle) {
+      return Response.json({ error: 'Invalid X handle. Please use @username format.' }, { status: 400 });
+    }
+  } else if (!url) {
+    return Response.json({ error: 'RSS URL is required.' }, { status: 400 });
+  }
+
+  const normalizedUrl = resolvedType === 'rss' ? (url ?? '').trim() : null;
+  if (resolvedType === 'rss' && !normalizedUrl) {
+    return Response.json({ error: 'RSS URL is required.' }, { status: 400 });
+  }
+
   const displayName = parsed.data.displayName
     ?? (resolvedType === 'rss'
       ? (() => {
           try {
-            const u = new URL(url as string);
+            const u = new URL(normalizedUrl as string);
             return u.hostname.replace(/^www\./, '');
           } catch {
-            return url as string;
+            return normalizedUrl as string;
           }
         })()
-      : (handle as string).replace(/^https?:\/\//, '').replace(/^@/, ''));
+      : formatTwitterHandle(normalizedHandle as string));
 
   const { data, error } = await (supabase as any)
     .from('sources')
     .insert({
       user_id: user.id,
       type: resolvedType,
-      url: resolvedType === 'rss' ? (url as string) : null,
-      handle: resolvedType === 'twitter' ? (handle as string) : null,
+      url: resolvedType === 'rss' ? (normalizedUrl as string) : null,
+      handle: resolvedType === 'twitter' ? (normalizedHandle as string) : null,
       display_name: displayName,
       status: 'queued',
     })
@@ -110,20 +127,35 @@ export async function POST(req: NextRequest) {
     console.warn('Failed to enqueue job', jobError);
   }
 
+  let ingestion: { success?: boolean; results?: unknown; status?: number; error?: unknown } | undefined;
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const slug = createdSource.type === 'twitter' ? 'twitter-fetch' : 'rss-fetch';
     const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${slug}`;
-    fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-      body: JSON.stringify({ sourceId: createdSource.id }),
-    }).catch((err) => {
+    try {
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({ sourceId: createdSource.id }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      const success = typeof payload?.success === 'boolean' ? payload.success : response.ok;
+      ingestion = {
+        success,
+        results: payload?.results,
+        status: response.status,
+        error: payload?.error,
+      };
+      if (!ingestion.success) {
+        console.warn(`Ingestion function ${slug} reported failure`, { payload, status: response.status });
+      }
+    } catch (err) {
       console.warn(`Failed to trigger ${slug}`, err);
-    });
+      ingestion = { success: false, results: null };
+    }
   }
 
-  return Response.json({ source: createdSource }, { status: 201 });
+  return Response.json({ source: createdSource, ingestion }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { formatTwitterHandle } from '@/lib/utils/twitter';
 
 type CacheEntry = { timestamp: number; payload: { items: unknown[]; nextCursor: string | null } };
 const FEED_CACHE = new Map<string, CacheEntry>();
@@ -15,7 +16,7 @@ type ItemRow = {
   published_at: string | null;
   metadata: Record<string, unknown> | null;
   focus_topics: string[] | null;
-  sources?: { display_name: string | null } | null;
+  sources?: { display_name: string | null; type: 'rss' | 'twitter'; handle?: string | null } | null;
 };
 
 const QuerySchema = z.object({
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('items')
-    .select('id, source_id, title, summary, url, published_at, metadata, focus_topics, sources!inner(display_name)', { count: 'exact' })
+    .select('id, source_id, title, summary, url, published_at, metadata, focus_topics, sources!inner(display_name, type, handle)', { count: 'exact' })
     .eq('sources.user_id', user.id)
     .order('published_at', { ascending: false, nullsFirst: false })
     .limit(limit);
@@ -72,19 +73,47 @@ export async function GET(req: NextRequest) {
     if (typeof popVal === 'number') popularity = popVal as number;
     const focusScore = focusTopics.length > 0 ? 0.7 : 0.4;
     const finalScore = focusBlend * focusScore + popBlend * popularity;
+    const sourceType: 'rss' | 'twitter' = row.sources?.type === 'twitter' ? 'twitter' : 'rss';
+    const usernameRaw = typeof md['username'] === 'string' ? (md['username'] as string) : undefined;
+    const fallbackHandle = row.sources?.handle ?? undefined;
+    const username = (usernameRaw ?? fallbackHandle)?.toLowerCase();
+    const sourceHandle = username ? formatTwitterHandle(username) : undefined;
+    const authorName = typeof md['authorName'] === 'string' && md['authorName'] ? (md['authorName'] as string) : row.sources?.display_name ?? undefined;
+
+    const tweetMetricsRaw = md['tweetMetrics'];
+    const tweetMetrics =
+      sourceType === 'twitter' && tweetMetricsRaw && typeof tweetMetricsRaw === 'object'
+        ? (() => {
+            const metrics = tweetMetricsRaw as Record<string, unknown>;
+            const likeCount = typeof metrics.likeCount === 'number' ? metrics.likeCount : undefined;
+            const retweetCount = typeof metrics.retweetCount === 'number' ? metrics.retweetCount : undefined;
+            const replyCount = typeof metrics.replyCount === 'number' ? metrics.replyCount : undefined;
+            const quoteCount = typeof metrics.quoteCount === 'number' ? metrics.quoteCount : undefined;
+            if (!likeCount && !retweetCount && !replyCount && !quoteCount) return undefined;
+            return { likeCount, retweetCount, replyCount, quoteCount };
+          })()
+        : undefined;
+
+    const tweetId = typeof md['tweetId'] === 'string' ? (md['tweetId'] as string) : undefined;
+
     return {
       id: row.id,
       title: row.title,
       summary: row.summary ?? '',
       url: row.url,
       sourceId: row.source_id,
-      sourceName: row.sources?.display_name ?? 'Source',
+      sourceName: authorName ?? sourceHandle ?? row.sources?.display_name ?? 'Source',
+      sourceHandle,
+      sourceType,
       publishedAt: row.published_at ?? null,
       focusTopics,
       focusScore,
       popularityScore: popularity,
       finalScore,
       isBookmarked: false,
+      tweetMetrics,
+      tweetId,
+      tweetUsername: username,
     };
   });
 

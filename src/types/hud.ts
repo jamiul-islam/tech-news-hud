@@ -19,12 +19,22 @@ export interface FeedItem {
   url: string;
   sourceId: string;
   sourceName: string;
+  sourceHandle?: string;
+  sourceType: SourceType;
   publishedAt?: string;
   focusTopics: string[];
   focusScore: number;
   popularityScore: number;
   finalScore: number;
   isBookmarked: boolean;
+  tweetId?: string;
+  tweetUsername?: string;
+  tweetMetrics?: {
+    likeCount?: number;
+    retweetCount?: number;
+    replyCount?: number;
+    quoteCount?: number;
+  };
 }
 
 export interface FocusPreferences {

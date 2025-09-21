@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import type { SourceType } from '@/types/hud';
 import { pushToast } from '@/store/toast-store';
+import { formatTwitterHandle, normalizeTwitterHandle } from '@/lib/utils/twitter';
 
 const tabs: Array<{ key: SourceType; label: string; placeholder: string }> = [
   {
@@ -64,25 +65,41 @@ export const SourceManager = () => {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!value.trim()) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
 
     const id = crypto.randomUUID();
-    const normalized = value.trim();
-    let displayName = normalized;
+    let normalizedValue = trimmed;
+    let displayName = trimmed;
 
     if (activeTab === 'rss') {
       try {
-        const url = new URL(normalized);
+        const url = new URL(trimmed);
+        normalizedValue = url.toString();
         displayName = url.hostname.replace(/^www\./, '');
       } catch {
-        displayName = normalized;
+        normalizedValue = trimmed;
+        displayName = trimmed;
       }
     } else {
-      displayName = normalized.replace(/^https?:\/\//, '').replace(/^@/, '');
+      const handle = normalizeTwitterHandle(trimmed);
+      if (!handle) {
+        pushToast('Could not read that X username. Try format @username.', 'error');
+        return;
+      }
+      normalizedValue = handle;
+      displayName = formatTwitterHandle(handle);
     }
 
     // Optimistic UI
-    upsertSource({ id, type: activeTab, displayName, url: activeTab === 'rss' ? normalized : undefined, handle: activeTab === 'twitter' ? normalized : undefined, status: 'queued' });
+    upsertSource({
+      id,
+      type: activeTab,
+      displayName,
+      url: activeTab === 'rss' ? normalizedValue : undefined,
+      handle: activeTab === 'twitter' ? normalizedValue : undefined,
+      status: 'queued',
+    });
 
     try {
       const res = await fetch('/api/sources', {
@@ -90,15 +107,16 @@ export const SourceManager = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: activeTab,
-          url: activeTab === 'rss' ? normalized : undefined,
-          handle: activeTab === 'twitter' ? normalized : undefined,
+          url: activeTab === 'rss' ? normalizedValue : undefined,
+          handle: activeTab === 'twitter' ? normalizedValue : undefined,
           displayName,
         }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error('Failed to add source');
+        const message = typeof data?.error === 'string' ? data.error : 'Failed to add source';
+        throw new Error(message);
       }
-      const data = await res.json();
       if (data?.source?.id) {
         upsertSource({
           id: data.source.id,
@@ -114,11 +132,41 @@ export const SourceManager = () => {
       setTimeout(() => {
         refreshFeed();
       }, 2500);
-      pushToast('Source added. Fetching latest stories…', 'success');
+      const ingestion = data?.ingestion;
+      if (ingestion && ingestion.success === false) {
+        const failure = Array.isArray(ingestion.results)
+          ? (ingestion.results as Array<{ sourceId?: string; error?: string; details?: unknown; retryAt?: string; status?: number }>).find(
+              (result) => result?.sourceId === data?.source?.id,
+            )
+          : null;
+        const reason = failure?.error ?? ingestion.error;
+        let message: string;
+        if (reason === 'missing_token') {
+          message = 'Missing X bearer token. Update Supabase edge function secrets to fetch tweets.';
+        } else if (reason === 'rate_limited') {
+          const retryAt = typeof failure?.retryAt === 'string' ? failure.retryAt : undefined;
+          message = retryAt
+            ? `X rate limit reached. Will retry after ${new Date(retryAt).toLocaleTimeString()}.`
+            : 'X rate limit reached. Please retry in a few minutes.';
+        } else if (typeof reason === 'string') {
+          message = `Added source but ingestion failed (${reason}). Check jobs log.`;
+        } else {
+          message = 'Added source but ingestion failed. Check jobs log.';
+        }
+        pushToast(message, 'error', { duration: 5000 });
+        console.warn('Ingestion failed for source', {
+          sourceId: data?.source?.id,
+          ingestion,
+          failure,
+        });
+      } else {
+        pushToast('Source added. Fetching latest stories…', 'success');
+      }
     } catch (err) {
       // revert optimistic on error
       removeSource(id);
-      pushToast('Could not add that source. Please check the URL/handle.', 'error');
+      const message = err instanceof Error ? err.message : 'Could not add that source. Please check the URL/handle.';
+      pushToast(message, 'error');
       console.warn('Add source failed', err);
     } finally {
       setValue('');

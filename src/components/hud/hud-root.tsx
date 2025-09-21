@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import type { SourceStatus } from '@/types/hud';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { FeedStream } from './feed-stream';
 import { FocusControls } from './focus-controls';
 import { BookmarkShelf } from './bookmark-shelf';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { pushToast } from '@/store/toast-store';
 
 const demoSources = [
   {
@@ -47,6 +48,8 @@ const demoItems = [
     url: 'https://news.ycombinator.com/item?id=42420000',
     sourceId: 'demo-hn',
     sourceName: 'Hacker News',
+    sourceHandle: undefined,
+    sourceType: 'rss' as const,
     publishedAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
     focusTopics: ['ai-research', 'agentic'],
     focusScore: 0.86,
@@ -62,12 +65,17 @@ const demoItems = [
     url: 'https://rundown.ai/briefings/lightweight-edge',
     sourceId: 'demo-twitter',
     sourceName: 'RundownAI',
+    sourceHandle: '@RundownAI',
+    sourceType: 'twitter' as const,
     publishedAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
     focusTopics: ['ai-infra', 'edge'],
     focusScore: 0.74,
     popularityScore: 0.71,
     finalScore: 0.73,
     isBookmarked: true,
+    tweetId: 'demo-2',
+    tweetUsername: 'rundownai',
+    tweetMetrics: { likeCount: 520, retweetCount: 87 },
   },
   {
     id: 'item-3',
@@ -77,6 +85,8 @@ const demoItems = [
     url: 'https://www.tldrnewsletter.com/ai/claude-roadmap',
     sourceId: 'demo-tldr',
     sourceName: 'TLDR AI',
+    sourceHandle: undefined,
+    sourceType: 'rss' as const,
     publishedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
     focusTopics: ['productivity', 'ai-tools'],
     focusScore: 0.68,
@@ -92,12 +102,17 @@ const demoItems = [
     url: 'https://x.com/thread/agi-timelines',
     sourceId: 'demo-twitter',
     sourceName: 'X — Followed',
+    sourceHandle: '@debate_ai',
+    sourceType: 'twitter' as const,
     publishedAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
     focusTopics: ['debate', 'ai-governance'],
     focusScore: 0.61,
     popularityScore: 0.84,
     finalScore: 0.69,
     isBookmarked: false,
+    tweetId: 'demo-4',
+    tweetUsername: 'debate_ai',
+    tweetMetrics: { likeCount: 1120, retweetCount: 340, replyCount: 87 },
   },
   {
     id: 'item-5',
@@ -107,6 +122,8 @@ const demoItems = [
     url: 'https://news.ycombinator.com/item?id=42417654',
     sourceId: 'demo-hn',
     sourceName: 'Hacker News',
+    sourceHandle: undefined,
+    sourceType: 'rss' as const,
     publishedAt: new Date(Date.now() - 1000 * 60 * 220).toISOString(),
     focusTopics: ['generative', 'video'],
     focusScore: 0.72,
@@ -144,6 +161,22 @@ type BookmarkRow = {
   const sourcesStatus = useAppStore((state) => state.sources.status);
   const feedStatus = useAppStore((state) => state.feed.status);
   const focusMixLabel = `${Math.round(focusWeight * 100)}% focus · ${Math.round((1 - focusWeight) * 100)}% signal`;
+  const errorNotified = useRef(new Set<string>());
+
+  useEffect(() => {
+    const seen = errorNotified.current;
+    sources.forEach((source) => {
+      if (source.status === 'error') {
+        if (!seen.has(source.id)) {
+          seen.add(source.id);
+          const label = source.displayName ?? source.handle ?? 'source';
+          pushToast(`We could not refresh ${label}. Check the handle or token and try again.`, 'error', { duration: 5000 });
+        }
+      } else {
+        seen.delete(source.id);
+      }
+    });
+  }, [sources]);
 
   const fetchAccountData = useCallback(async () => {
     try {

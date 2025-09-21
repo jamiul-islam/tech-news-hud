@@ -28,7 +28,7 @@
 ## 2. Backend (Next.js API Routes)
 ### 2.1 Source Management API
 - [x] Implement `POST /api/sources` validating RSS URL or X handle.
-- [ ] Insert source row, enqueue job (`jobs` table) inside route (persisted via Supabase client SDK calls).
+- [x] Insert source row, enqueue job (`jobs` table) inside route (persisted via Supabase client SDK calls).
 - [x] Implement `DELETE /api/sources/:id` with ownership checks.
 - [ ] Write integration tests using `@testing-library/jest-dom` + mocked Supabase client.
 
@@ -51,9 +51,9 @@
 - [ ] Add regression test for RSS parser with fixture feed.
 
 ### 3.2 Twitter/X Pipeline
-- [ ] Create worker stub using `twitter-api-sdk` (user token input) and plan deployment path (MCP-managed).
-- [ ] Normalize tweets into `items` table with engagement metrics.
-- [ ] Handle rate-limit retries with exponential backoff; confirm via MCP-deployed worker logs (when available).
+- [x] Create worker stub using `twitter-api-sdk` (user token input) and plan deployment path (MCP-managed).
+- [x] Normalize tweets into `items` table with engagement metrics.
+- [x] Handle rate-limit retries with exponential backoff; confirm via MCP-deployed worker logs (when available).
 - [ ] Add mocked tests around normalization.
 
 ## 4. Frontend (App Router + Zustand)
