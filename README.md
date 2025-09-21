@@ -2,6 +2,11 @@
 
 An AI‑powered HUD for tracking the latest tech news. Users can add RSS feeds or X (formerly Twitter) profiles of selected tech figures and receive real‑time updates.
 
+## App UI
+
+<!-- markdownlint-disable-next-line MD033 -->
+<img src="./public/app-screenshot.png" alt="App UI Screenshot" width="100%" />
+
 ## Quick Start
 
 1. Create `.env.local` with Supabase credentials:
