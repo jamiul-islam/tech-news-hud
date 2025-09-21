@@ -1,11 +1,6 @@
-# AI Tech News HUD
+# High-Signal News HUD
 
 An AI‑powered HUD for tracking the latest tech news. Users can add RSS feeds or X (formerly Twitter) profiles of selected tech figures and receive real‑time updates.
-
-## Prerequisites
-
-- Node.js 18.18+ or 20+
-- npm (or bun)
 
 ## Quick Start
 
@@ -28,28 +23,43 @@ npm install
 npm run dev
 ```
 
-App runs at [http://localhost:3000](http://localhost:3000).
+App runs at [http://localhost:3000](http://localhost:3000)
 
-## Scripts
+## API Routes
 
-- `npm run dev` — Start development server (Turbopack)
-- `npm run build` — Build for production (Turbopack)
-- `npm run start` — Start production server
-- `npm run lint` — Lint the codebase
+- `POST /api/sources` — validate + insert RSS/X source, enqueue job, trigger ingestion
+- `DELETE /api/sources/:id` — remove user-owned source
+- `GET /api/feed` — return ranked items for user sources (cursor + blend scores)
+- `GET/POST /api/preferences` — fetch/update focus weights, scroll speed, theme
+- `GET/POST /api/bookmarks` & `DELETE /api/bookmarks/:itemId` — sync saved stories
 
-## Tech
+Associated Edge Functions (Supabase)
 
-- Next.js 15, React 19, TypeScript
-- Tailwind CSS v4
-- Supabase client (browser + server) at `src/lib/supabase`
-- State: Zustand
+- `rss-fetch` — fetches/parses RSS, dedupes, classifies topics, logs jobs
+- `twitter-fetch` — placeholder worker for X ingestion (hooks are ready)
 
-## Project Structure
+## Tech Stack
 
-- App routes: `src/app`
-- UI components: `src/components`
-- Utilities: `src/lib`, `src/store`, `src/types`
+- Next.js 15 (App Router) • React 19 • TypeScript
+- Styling: Tailwind CSS v4 + minimal custom tokens
+- State: Zustand (session, feed, prefs, bookmarks slices)
+- Backend: Supabase (Auth, Postgres with RLS, cron-ready jobs table)
+- Edge Functions: Supabase Functions for ingestion & future expansion
+- MCP: Supabase MCP server for migrations, deployments, automation
 
-## Deployment
+## Package Scripts
 
-Works on Vercel or any Next.js-compatible platform. Set required env vars in your hosting provider.
+- `npm run dev` — Start Turbopack dev server
+- `npm run build` — Production build (Turbopack)
+- `npm run start` — Serve production build
+- `npm run lint` — Run ESLint
+
+## Directory Layout
+
+- `src/app` — App Router routes (`/`, `/auth`, `/hud`, API handlers)
+- `src/components` — HUD modules, reusable UI primitives
+- `src/lib` — Supabase clients, utilities
+- `src/store` — Zustand slices
+- `supabase/functions` — Edge Functions (RSS + Twitter stubs)
+
+Deploy to Vercel (or any Next.js host) and mirror Supabase env vars. Jobs & Edge Functions ship via Supabase CLI / MCP. A GitHub Actions or cron driver should ping `rss-fetch` periodically until pg_cron is enabled.
