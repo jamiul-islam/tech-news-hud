@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const admin = getAdminSupabase();
-    await admin.from('jobs').insert({
+    await (admin as any).from('jobs').insert({
       source_id: createdSource.id,
       status: 'queued',
       scheduled_for: new Date().toISOString(),

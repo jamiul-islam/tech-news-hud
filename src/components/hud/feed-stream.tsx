@@ -20,18 +20,20 @@ export const FeedStream = () => {
   const upsertBookmark = useAppStore((state) => state.upsertBookmark);
   const removeBookmark = useAppStore((state) => state.removeBookmark);
 
-  const sortedItems = useMemo(
-    () =>
-      [...items].sort((a, b) => {
-        const scoreDelta = b.finalScore - a.finalScore;
-        if (Math.abs(scoreDelta) > 0.0001) return scoreDelta;
-        if (a.publishedAt && b.publishedAt) {
-          return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
-        }
-        return 0;
-      }),
-    [items],
-  );
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      if (dateA !== dateB) {
+        return dateB - dateA; // newest first
+      }
+      const scoreDelta = b.finalScore - a.finalScore;
+      if (Math.abs(scoreDelta) > 0.0001) {
+        return scoreDelta;
+      }
+      return b.popularityScore - a.popularityScore;
+    });
+  }, [items]);
 
   const toggleBookmark = async (id: string) => {
     const nextItems = items.map((item) =>
