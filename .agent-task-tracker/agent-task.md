@@ -34,8 +34,8 @@
 
 ### 2.2 Feed Retrieval API
 - [x] Implement `GET /api/feed` merging items, applying ranking formula.
-- [ ] Support pagination cursor and `mixRatio` query param.
-- [ ] Add caching layer (in-memory for MVP) to avoid duplicate scoring.
+- [x] Support pagination cursor and `mixRatio` query param.
+- [x] Add caching layer (in-memory for MVP) to avoid duplicate scoring.
 - [ ] Unit test ranking algorithm (mock data covering focus/popularity extremes).
 
 ### 2.3 Bookmark & Preferences API
@@ -88,7 +88,7 @@
 ### 4.6 Controls & Bookmarks
 - [x] Build `FocusControls` slider component adjusting focus/popularity mix.
 - [x] Implement `BookmarkShelf` carousel resurfacing every 30 minutes (timer in store).
-- [ ] Add toast confirmations and snooze CTA.
+- [x] Add toast confirmations and snooze CTA.
 
 ### 4.7 Optional AI Settings
 - [ ] Create modal allowing user to store OpenAI/Gemini API keys.
