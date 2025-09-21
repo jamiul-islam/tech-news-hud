@@ -5,6 +5,21 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
 const PostBody = z.object({ itemId: z.string().uuid() });
 
+export async function GET() {
+  const supabase = await getSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return Response.json({ bookmarks: [] }, { status: 401 });
+  const { data, error } = await (supabase as any)
+    .from('bookmarks')
+    .select('item_id, bookmarked_at, surfaced_at')
+    .eq('user_id', user.id)
+    .order('bookmarked_at', { ascending: false });
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  return Response.json({ bookmarks: data ?? [] });
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await getSupabaseServerClient();
   const body = await req.json().catch(() => ({}));

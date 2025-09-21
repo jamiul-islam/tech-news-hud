@@ -26,6 +26,37 @@ export const SourceManager = () => {
   const sources = useAppStore((state) => state.sources.items);
   const upsertSource = useAppStore((state) => state.upsertSource);
   const removeSource = useAppStore((state) => state.removeSource);
+  const setFeedItems = useAppStore((state) => state.setFeedItems);
+  const setFeedStatus = useAppStore((state) => state.setFeedStatus);
+
+  const refreshFeed = async () => {
+    try {
+      setFeedStatus('loading');
+      const res = await fetch('/api/feed?limit=50', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load feed');
+      const data = await res.json();
+      setFeedItems(data.items ?? []);
+      setFeedStatus('success');
+    } catch (err) {
+      console.warn('Failed to refresh feed', err);
+      setFeedStatus('error');
+    }
+  };
+
+  const handleRemove = async (sourceId: string) => {
+    const existing = sources.find((s) => s.id === sourceId);
+    removeSource(sourceId);
+    try {
+      const res = await fetch(`/api/sources/${sourceId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete source');
+      await refreshFeed();
+    } catch (err) {
+      if (existing) {
+        upsertSource(existing);
+      }
+      console.warn('Remove source failed', err);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -75,6 +106,10 @@ export const SourceManager = () => {
           lastPolledAt: data.source.last_polled_at ?? undefined,
         });
       }
+      refreshFeed();
+      setTimeout(() => {
+        refreshFeed();
+      }, 2500);
     } catch (err) {
       // revert optimistic on error
       removeSource(id);
@@ -148,7 +183,7 @@ export const SourceManager = () => {
                     type="button"
                     aria-label={`Remove ${source.displayName}`}
                     className="ml-2 text-xs text-[#0F0F0F]/60 hover:text-[#0F0F0F] dark:text-[#F8F8F8]/60 dark:hover:text-[#F8F8F8]"
-                    onClick={() => removeSource(source.id)}
+                    onClick={() => handleRemove(source.id)}
                   >
                     ×
                   </button>

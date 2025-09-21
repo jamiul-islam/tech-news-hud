@@ -11,6 +11,43 @@ const Body = z.object({
   focusTopics: z.record(z.string(), z.number()).optional(),
 });
 
+export async function GET() {
+  const supabase = await getSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return Response.json({ preferences: null }, { status: 401 });
+
+  const { data, error } = await (supabase as any)
+    .from('profiles')
+    .select('focus_tags, ai_settings')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  const ai = (data?.ai_settings ?? {}) as Record<string, unknown>;
+  const focusTopicsRecord =
+    ai.focusTopics && typeof ai.focusTopics === 'object' ? (ai.focusTopics as Record<string, number>) : {};
+
+  const themeValue = ai.theme;
+  const theme = themeValue === 'light' || themeValue === 'dark' || themeValue === 'system' ? themeValue : 'system';
+
+  return Response.json({
+    preferences: {
+      focusWeight: typeof ai.focusWeight === 'number' ? (ai.focusWeight as number) : 0.7,
+      autoScrollIntervalMs:
+        typeof ai.autoScrollIntervalMs === 'number' ? (ai.autoScrollIntervalMs as number) : 7000,
+      theme,
+      showAiSummaries: ai.showAiSummaries === true,
+      focusTopics: focusTopicsRecord,
+    },
+    focusTags: data?.focus_tags ?? [],
+  });
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await getSupabaseServerClient();
   const body = await req.json().catch(() => ({}));
@@ -29,6 +66,7 @@ export async function POST(req: NextRequest) {
     theme: prefs.theme,
     showAiSummaries: prefs.showAiSummaries,
     focusWeight: prefs.focusWeight,
+    focusTopics: prefs.focusTopics ?? null,
   };
 
   const { error } = await (supabase as any)

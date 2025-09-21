@@ -57,6 +57,16 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+  await (supabase as any)
+    .from('profiles')
+    .upsert(
+      {
+        id: user.id,
+        email: user.email,
+      },
+      { onConflict: 'id' },
+    );
+
   // Infer type if not provided
   const resolvedType: 'rss' | 'twitter' = type ?? (url ? 'rss' : 'twitter');
   const displayName = parsed.data.displayName
@@ -85,5 +95,22 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ source: data as SourceRow }, { status: 201 });
+
+  const createdSource = data as SourceRow;
+
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/rss-fetch`;
+    fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ sourceId: createdSource.id }),
+    }).catch((err) => {
+      console.warn('Failed to trigger rss-fetch', err);
+    });
+  }
+
+  return Response.json({ source: createdSource }, { status: 201 });
 }

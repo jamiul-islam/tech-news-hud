@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import type { SourceStatus } from '@/types/hud';
+import { Button } from '@/components/ui/button';
 import { AutoScrollBanner } from './auto-scroll-banner';
 import { SourceManager } from './source-manager';
 import { FeedStream } from './feed-stream';
@@ -121,8 +122,44 @@ export const HudRoot = () => {
   const setSourcesStatus = useAppStore((state) => state.setSourcesStatus);
   const setFeedStatus = useAppStore((state) => state.setFeedStatus);
   const setBookmarkEntries = useAppStore((state) => state.setBookmarkEntries);
+  const updatePreferences = useAppStore((state) => state.updatePreferences);
   const focusWeight = useAppStore((state) => state.preferences.focusWeight);
   const focusMixLabel = `${Math.round(focusWeight * 100)}% focus · ${Math.round((1 - focusWeight) * 100)}% signal`;
+
+  const fetchAccountData = async () => {
+    try {
+      const [prefsRes, bookmarksRes] = await Promise.all([
+        fetch('/api/preferences', { cache: 'no-store' }),
+        fetch('/api/bookmarks', { cache: 'no-store' }),
+      ]);
+      if (prefsRes.ok) {
+        const prefsData = await prefsRes.json();
+        if (prefsData?.preferences) {
+          updatePreferences({
+            focusWeight: prefsData.preferences.focusWeight,
+            autoScrollIntervalMs: prefsData.preferences.autoScrollIntervalMs,
+            theme: prefsData.preferences.theme,
+            showAiSummaries: prefsData.preferences.showAiSummaries,
+            focusTopics: prefsData.preferences.focusTopics ?? {},
+          });
+        }
+      }
+      if (bookmarksRes.ok) {
+        const bookmarkData = await bookmarksRes.json();
+        if (Array.isArray(bookmarkData?.bookmarks)) {
+          setBookmarkEntries(
+            bookmarkData.bookmarks.map((item: any) => ({
+              itemId: item.item_id,
+              bookmarkedAt: item.bookmarked_at,
+              surfacedAt: item.surfaced_at ?? undefined,
+            })),
+          );
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch account data', error);
+    }
+  };
 
   useEffect(() => {
     async function bootstrap() {
@@ -142,13 +179,13 @@ export const HudRoot = () => {
                     ? (maybeStatus as SourceStatus)
                     : 'idle';
                   return {
-                   id: s.id,
-                   type: s.type,
-                   displayName: s.display_name ?? 'Source',
-                   url: s.url ?? undefined,
-                   handle: s.handle ?? undefined,
+                    id: s.id,
+                    type: s.type,
+                    displayName: s.display_name ?? 'Source',
+                    url: s.url ?? undefined,
+                    handle: s.handle ?? undefined,
                     status,
-                   lastPolledAt: s.last_polled_at ?? undefined,
+                    lastPolledAt: s.last_polled_at ?? undefined,
                   };
                 }),
               );
@@ -160,12 +197,14 @@ export const HudRoot = () => {
                 const feed = await feedRes.json();
                 setFeedItems(feed.items ?? []);
                 setFeedStatus('success');
+                await fetchAccountData();
                 return;
               }
             }
             // If authenticated but no sources, show empty state (do not fallback)
             setSourcesStatus('success');
             setFeedStatus('success');
+            await fetchAccountData();
             return;
           }
         } catch {
@@ -203,10 +242,15 @@ export const HudRoot = () => {
           </h1>
         </div>
         <div className="flex items-center gap-3 text-sm text-[#0F0F0F]/60 dark:text-[#F8F8F8]/60">
-          <span className="hidden sm:inline">Focus mix:</span>
-          <div className="rounded-full bg-[#4C7EFF]/15 px-4 py-1 text-[#4C7EFF]">
-            {focusMixLabel}
+          <div className="hidden sm:inline-flex items-center gap-3">
+            <span>Focus mix:</span>
+            <div className="rounded-full bg-[#4C7EFF]/15 px-4 py-1 text-[#4C7EFF]">{focusMixLabel}</div>
           </div>
+          <form action="/auth/signout" method="post">
+            <Button variant="secondary" size="sm" type="submit">
+              Sign out
+            </Button>
+          </form>
         </div>
       </header>
 
