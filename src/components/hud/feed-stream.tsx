@@ -33,7 +33,7 @@ export const FeedStream = () => {
     [items],
   );
 
-  const toggleBookmark = (id: string) => {
+  const toggleBookmark = async (id: string) => {
     const nextItems = items.map((item) =>
       item.id === id ? { ...item, isBookmarked: !item.isBookmarked } : item,
     );
@@ -44,8 +44,22 @@ export const FeedStream = () => {
 
     if (target.isBookmarked) {
       upsertBookmark({ itemId: target.id, bookmarkedAt: new Date().toISOString() });
+      try {
+        await fetch('/api/bookmarks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: target.id }),
+        });
+      } catch (error) {
+        console.warn('Failed to save bookmark', error);
+      }
     } else {
       removeBookmark(target.id);
+      try {
+        await fetch(`/api/bookmarks/${target.id}`, { method: 'DELETE' });
+      } catch (error) {
+        console.warn('Failed to delete bookmark', error);
+      }
     }
   };
 

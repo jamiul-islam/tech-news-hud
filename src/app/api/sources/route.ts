@@ -2,6 +2,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getAdminSupabase } from '@/lib/supabase/admin-client';
 
 type SourceRow = {
   id: string;
@@ -98,8 +99,20 @@ export async function POST(req: NextRequest) {
 
   const createdSource = data as SourceRow;
 
+  try {
+    const admin = getAdminSupabase();
+    await admin.from('jobs').insert({
+      source_id: createdSource.id,
+      status: 'queued',
+      scheduled_for: new Date().toISOString(),
+    });
+  } catch (jobError) {
+    console.warn('Failed to enqueue job', jobError);
+  }
+
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/rss-fetch`;
+    const slug = createdSource.type === 'twitter' ? 'twitter-fetch' : 'rss-fetch';
+    const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${slug}`;
     fetch(functionUrl, {
       method: 'POST',
       headers: {
@@ -108,7 +121,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({ sourceId: createdSource.id }),
     }).catch((err) => {
-      console.warn('Failed to trigger rss-fetch', err);
+      console.warn(`Failed to trigger ${slug}`, err);
     });
   }
 

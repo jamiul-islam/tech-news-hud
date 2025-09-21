@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
 import type { SourceStatus } from '@/types/hud';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { SourceManager } from './source-manager';
 import { FeedStream } from './feed-stream';
 import { FocusControls } from './focus-controls';
 import { BookmarkShelf } from './bookmark-shelf';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 
 const demoSources = [
   {
@@ -116,6 +117,22 @@ const demoItems = [
 ];
 
 export const HudRoot = () => {
+type ApiSource = {
+  id: string;
+  type: 'rss' | 'twitter';
+  display_name?: string | null;
+  url?: string | null;
+  handle?: string | null;
+  status?: string | null;
+  last_polled_at?: string | null;
+};
+
+type BookmarkRow = {
+  item_id: string;
+  bookmarked_at: string;
+  surfaced_at?: string | null;
+};
+
   const sources = useAppStore((state) => state.sources.items);
   const setSources = useAppStore((state) => state.setSources);
   const setFeedItems = useAppStore((state) => state.setFeedItems);
@@ -124,9 +141,11 @@ export const HudRoot = () => {
   const setBookmarkEntries = useAppStore((state) => state.setBookmarkEntries);
   const updatePreferences = useAppStore((state) => state.updatePreferences);
   const focusWeight = useAppStore((state) => state.preferences.focusWeight);
+  const sourcesStatus = useAppStore((state) => state.sources.status);
+  const feedStatus = useAppStore((state) => state.feed.status);
   const focusMixLabel = `${Math.round(focusWeight * 100)}% focus · ${Math.round((1 - focusWeight) * 100)}% signal`;
 
-  const fetchAccountData = async () => {
+  const fetchAccountData = useCallback(async () => {
     try {
       const [prefsRes, bookmarksRes] = await Promise.all([
         fetch('/api/preferences', { cache: 'no-store' }),
@@ -145,10 +164,10 @@ export const HudRoot = () => {
         }
       }
       if (bookmarksRes.ok) {
-        const bookmarkData = await bookmarksRes.json();
+        const bookmarkData: { bookmarks?: BookmarkRow[] } = await bookmarksRes.json();
         if (Array.isArray(bookmarkData?.bookmarks)) {
           setBookmarkEntries(
-            bookmarkData.bookmarks.map((item: any) => ({
+            bookmarkData.bookmarks.map((item) => ({
               itemId: item.item_id,
               bookmarkedAt: item.bookmarked_at,
               surfacedAt: item.surfaced_at ?? undefined,
@@ -159,7 +178,7 @@ export const HudRoot = () => {
     } catch (error) {
       console.warn('Failed to fetch account data', error);
     }
-  };
+  }, [setBookmarkEntries, updatePreferences]);
 
   useEffect(() => {
     async function bootstrap() {
@@ -169,7 +188,7 @@ export const HudRoot = () => {
         try {
           const res = await fetch('/api/sources', { cache: 'no-store' });
           if (res.ok) {
-            const data: { sources?: Array<{ id: string; type: 'rss' | 'twitter'; display_name?: string | null; url?: string | null; handle?: string | null; status?: string | null; last_polled_at?: string | null }> } = await res.json();
+            const data: { sources?: ApiSource[] } = await res.json();
             if (Array.isArray(data.sources) && data.sources.length > 0) {
               const validStatuses: ReadonlyArray<SourceStatus> = ['idle', 'queued', 'fetching', 'error'];
               setSources(
@@ -228,10 +247,13 @@ export const HudRoot = () => {
       }
     }
     bootstrap();
-  }, [setFeedItems, setFeedStatus, setSources, setSourcesStatus, setBookmarkEntries, sources.length]);
+  }, [fetchAccountData, setFeedItems, setFeedStatus, setSources, setSourcesStatus, setBookmarkEntries, sources.length]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-10">
+    <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-10">
+      {sourcesStatus === 'loading' && feedStatus === 'loading' && (
+        <LoadingIndicator />
+      )}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.4em] text-[#4C7EFF]">

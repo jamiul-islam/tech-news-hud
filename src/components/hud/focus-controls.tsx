@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -11,6 +11,7 @@ export const FocusControls = () => {
   const updatePreferences = useAppStore((state) => state.updatePreferences);
   const autoScrollActive = useAppStore((state) => state.feed.autoScrollActive);
   const toggleAutoScroll = useAppStore((state) => state.toggleAutoScroll);
+  const lastPersisted = useRef<string>('');
 
   const focusPercent = useMemo(
     () => Math.round(preferences.focusWeight * 100),
@@ -22,6 +23,35 @@ export const FocusControls = () => {
     const nextIndex = (order.indexOf(preferences.theme) + 1) % order.length;
     updatePreferences({ theme: order[nextIndex] });
   };
+
+  useEffect(() => {
+    const payload = {
+      focusWeight: preferences.focusWeight,
+      autoScrollIntervalMs: preferences.autoScrollIntervalMs,
+      theme: preferences.theme,
+      showAiSummaries: preferences.showAiSummaries,
+      focusTopics: preferences.focusTopics,
+    };
+    const signature = JSON.stringify(payload);
+    if (!lastPersisted.current) {
+      lastPersisted.current = signature;
+      return;
+    }
+    if (lastPersisted.current === signature) return;
+    const timer = setTimeout(async () => {
+      try {
+        await fetch('/api/preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        lastPersisted.current = signature;
+      } catch (error) {
+        console.warn('Failed to persist preferences', error);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [preferences.autoScrollIntervalMs, preferences.focusTopics, preferences.focusWeight, preferences.showAiSummaries, preferences.theme]);
 
   return (
     <section className="space-y-6">
