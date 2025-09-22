@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { pushToast } from '@/store/toast-store';
 
 export const FocusControls = () => {
   const preferences = useAppStore((state) => state.preferences);
@@ -12,6 +14,10 @@ export const FocusControls = () => {
   const autoScrollActive = useAppStore((state) => state.feed.autoScrollActive);
   const toggleAutoScroll = useAppStore((state) => state.toggleAutoScroll);
   const lastPersisted = useRef<string>('');
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [loadingGeminiKey, setLoadingGeminiKey] = useState(true);
+  const [keyInput, setKeyInput] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
 
   const focusPercent = useMemo(
     () => Math.round(preferences.focusWeight * 100),
@@ -22,6 +28,84 @@ export const FocusControls = () => {
     const order: Array<typeof preferences.theme> = ['system', 'light', 'dark'];
     const nextIndex = (order.indexOf(preferences.theme) + 1) % order.length;
     updatePreferences({ theme: order[nextIndex] });
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch('/api/ai/key', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Failed to load AI key status');
+        const data = await res.json();
+        if (isMounted) {
+          setHasGeminiKey(Boolean(data?.hasGeminiKey));
+        }
+      } catch (error) {
+        console.warn('Failed to load Gemini key status', error);
+      } finally {
+        if (isMounted) setLoadingGeminiKey(false);
+      }
+    };
+    fetchStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasGeminiKey && preferences.showAiSummaries) {
+      updatePreferences({ showAiSummaries: false });
+    }
+  }, [hasGeminiKey, preferences.showAiSummaries, updatePreferences]);
+
+  const handleSaveGeminiKey = async () => {
+    if (!keyInput.trim()) {
+      pushToast('Enter a Gemini API key first.', 'error');
+      return;
+    }
+    setSavingKey(true);
+    try {
+      const res = await fetch('/api/ai/key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'gemini', apiKey: keyInput.trim() }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        const message = typeof payload?.error === 'string' ? payload.error : 'Failed to store Gemini key';
+        throw new Error(message);
+      }
+      setHasGeminiKey(true);
+      setKeyInput('');
+      pushToast('Gemini API key saved.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to store Gemini key';
+      pushToast(message, 'error');
+      console.warn('Saving Gemini API key failed', error);
+    } finally {
+      setSavingKey(false);
+    }
+  };
+
+  const handleRemoveGeminiKey = async () => {
+    setSavingKey(true);
+    try {
+      const res = await fetch('/api/ai/key', { method: 'DELETE' });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        const message = typeof payload?.error === 'string' ? payload.error : 'Failed to remove Gemini key';
+        throw new Error(message);
+      }
+      setHasGeminiKey(false);
+      updatePreferences({ showAiSummaries: false });
+      pushToast('Gemini API key removed.', 'info');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to remove Gemini key';
+      pushToast(message, 'error');
+      console.warn('Removing Gemini API key failed', error);
+    } finally {
+      setSavingKey(false);
+    }
   };
 
   useEffect(() => {
@@ -124,16 +208,66 @@ export const FocusControls = () => {
             <div>
               <p className="font-medium">AI summaries</p>
               <p className="text-xs text-[#0F0F0F]/60 dark:text-[#F8F8F8]/60">
-                Toggle when you supply an OpenAI or Gemini key in settings.
+                Toggle once your Gemini key is connected.
               </p>
             </div>
             <Switch
               checked={preferences.showAiSummaries}
-              onClick={() =>
-                updatePreferences({ showAiSummaries: !preferences.showAiSummaries })
-              }
+              disabled={!hasGeminiKey || savingKey || loadingGeminiKey}
+              onClick={() => {
+                if (!hasGeminiKey) {
+                  pushToast('Add a Gemini API key first.', 'info');
+                  return;
+                }
+                updatePreferences({ showAiSummaries: !preferences.showAiSummaries });
+              }}
               aria-label="Toggle AI summaries"
             />
+          </div>
+
+          <div className="space-y-2 text-sm">
+            <p className="font-medium">Gemini API key</p>
+            <p className="text-xs text-[#0F0F0F]/60 dark:text-[#F8F8F8]/60">
+              Stored privately for generating summaries. You can rotate or remove it anytime.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                id="gemini-api-key"
+                type="password"
+                value={keyInput}
+                onChange={(event) => setKeyInput(event.target.value)}
+                placeholder={hasGeminiKey ? '••••••••••••••••••' : 'Paste your Gemini API key'}
+                disabled={savingKey}
+                className="sm:flex-1"
+              />
+              <Button
+                type="button"
+                onClick={handleSaveGeminiKey}
+                disabled={savingKey || keyInput.trim().length === 0}
+              >
+                {savingKey ? 'Saving…' : hasGeminiKey ? 'Update key' : 'Save key'}
+              </Button>
+            </div>
+            <div className="flex items-center justify-between text-xs text-[#0F0F0F]/60 dark:text-[#F8F8F8]/60">
+              <span>
+                {loadingGeminiKey
+                  ? 'Checking key status…'
+                  : hasGeminiKey
+                  ? 'Gemini summaries enabled.'
+                  : 'No Gemini key stored yet.'}
+              </span>
+              {hasGeminiKey && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveGeminiKey}
+                  disabled={savingKey}
+                >
+                  Remove key
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

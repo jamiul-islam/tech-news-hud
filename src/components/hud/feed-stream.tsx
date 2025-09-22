@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,13 +28,75 @@ export const FeedStream = () => {
   const status = useAppStore((state) => state.feed.status);
   const setFeedItems = useAppStore((state) => state.setFeedItems);
   const setFeedNextCursor = useAppStore((state) => state.setFeedNextCursor);
+  const updateFeedItem = useAppStore((state) => state.updateFeedItem);
   const upsertBookmark = useAppStore((state) => state.upsertBookmark);
   const removeBookmark = useAppStore((state) => state.removeBookmark);
   const nextCursor = useAppStore((state) => state.feed.nextCursor);
   const focusWeight = useAppStore((state) => state.preferences.focusWeight);
+  const showAiSummaries = useAppStore((state) => state.preferences.showAiSummaries);
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [summaryStatus, setSummaryStatus] = useState<Record<string, 'loading' | 'error'>>({});
+  const activeRequests = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!showAiSummaries) {
+      setSummaryStatus({});
+      return;
+    }
+
+    let cancelled = false;
+    const pending = items.filter(
+      (item) => !item.aiSummary && !activeRequests.current.has(item.id),
+    );
+    if (pending.length === 0) return undefined;
+
+    const run = async () => {
+      for (const item of pending) {
+        if (cancelled) break;
+        activeRequests.current.add(item.id);
+        setSummaryStatus((prev) => ({ ...prev, [item.id]: 'loading' }));
+        try {
+          const response = await fetch('/api/ai/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId: item.id }),
+          });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            const message = typeof payload?.error === 'string' ? payload.error : 'Failed to generate summary';
+            throw new Error(message);
+          }
+          const payload = await response.json();
+          const summaryText = typeof payload?.summary === 'string' ? payload.summary.trim() : '';
+          if (summaryText) {
+            updateFeedItem(item.id, { aiSummary: summaryText, aiSummaryUpdatedAt: new Date().toISOString() });
+            setSummaryStatus((prev) => {
+              const next = { ...prev };
+              delete next[item.id];
+              return next;
+            });
+          } else {
+            throw new Error('Summary missing from response');
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Failed to generate summary';
+          setSummaryStatus((prev) => ({ ...prev, [item.id]: 'error' }));
+          console.warn('AI summary generation failed', { itemId: item.id, error });
+          pushToast(message, 'error');
+        } finally {
+          activeRequests.current.delete(item.id);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, showAiSummaries, updateFeedItem]);
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -161,10 +223,32 @@ export const FeedStream = () => {
                 >
                   {item.title}
                 </a>
-                {item.summary && (
-                  <p className="text-sm text-[#0F0F0F]/70 dark:text-[#F8F8F8]/70">
-                    {item.summary}
-                  </p>
+                {showAiSummaries ? (
+                  <div className="space-y-1">
+                    <p className="text-sm text-[#0F0F0F]/80 dark:text-[#F8F8F8]/80">
+                      {item.aiSummary
+                        ? item.aiSummary
+                        : summaryStatus[item.id] === 'loading'
+                        ? 'Generating AI summary…'
+                        : item.summary ?? 'No summary available yet.'}
+                    </p>
+                    {summaryStatus[item.id] === 'error' && (
+                      <p className="text-xs text-red-600 dark:text-red-300">
+                        AI summary unavailable.
+                      </p>
+                    )}
+                    {item.aiSummary && item.summary && (
+                      <p className="text-xs text-[#0F0F0F]/50 dark:text-[#F8F8F8]/50">
+                        Source snippet: {item.summary}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  item.summary && (
+                    <p className="text-sm text-[#0F0F0F]/70 dark:text-[#F8F8F8]/70">
+                      {item.summary}
+                    </p>
+                  )
                 )}
               </div>
 

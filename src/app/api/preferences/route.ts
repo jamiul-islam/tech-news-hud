@@ -61,12 +61,23 @@ export async function POST(req: NextRequest) {
 
   const prefs = parsed.data;
   const focusTags = prefs.focusTopics ? Object.keys(prefs.focusTopics) : undefined;
+
+  const { data: existingProfile } = await (supabase as any)
+    .from('profiles')
+    .select('ai_settings')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const existingSettings = (existingProfile?.ai_settings ?? {}) as Record<string, unknown>;
   const aiSettings: Record<string, unknown> = {
-    autoScrollIntervalMs: prefs.autoScrollIntervalMs,
-    theme: prefs.theme,
-    showAiSummaries: prefs.showAiSummaries,
-    focusWeight: prefs.focusWeight,
-    focusTopics: prefs.focusTopics ?? null,
+    ...existingSettings,
+    autoScrollIntervalMs:
+      prefs.autoScrollIntervalMs ?? (existingSettings.autoScrollIntervalMs as number | undefined) ?? 7000,
+    theme: prefs.theme ?? (existingSettings.theme as 'light' | 'dark' | 'system' | undefined) ?? 'system',
+    showAiSummaries:
+      prefs.showAiSummaries ?? (existingSettings.showAiSummaries as boolean | undefined) ?? false,
+    focusWeight: prefs.focusWeight ?? (existingSettings.focusWeight as number | undefined) ?? 0.7,
+    focusTopics: prefs.focusTopics ?? (existingSettings.focusTopics as Record<string, number> | null | undefined) ?? null,
   };
 
   const { error } = await (supabase as any)

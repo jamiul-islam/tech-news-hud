@@ -47,18 +47,39 @@ export const AppProviders = ({ children }: Props) => {
 
   useEffect(() => {
     const root = document.documentElement;
+    const body = document.body;
+
+    const applyMode = (mode: 'light' | 'dark') => {
+      const isDark = mode === 'dark';
+      root.classList.toggle('dark', isDark);
+      root.style.setProperty('--background-light', isDark ? '#0b0b0b' : '#f8f8f8');
+      root.style.setProperty('--foreground-light', isDark ? '#f8f8f8' : '#0f0f0f');
+      body.style.backgroundColor = isDark ? '#0b0b0b' : '#f8f8f8';
+      body.style.color = isDark ? '#f8f8f8' : '#0f0f0f';
+      root.style.colorScheme = isDark ? 'dark' : 'light';
+    };
+
+    let mediaQuery: MediaQueryList | null = null;
+    let listener: ((event: MediaQueryListEvent) => void) | null = null;
+
     if (theme === 'dark') {
-      root.classList.add('dark');
+      applyMode('dark');
     } else if (theme === 'light') {
-      root.classList.remove('dark');
+      applyMode('light');
     } else {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      if (mediaQuery.matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
+      mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      applyMode(mediaQuery.matches ? 'dark' : 'light');
+      listener = (event: MediaQueryListEvent) => {
+        applyMode(event.matches ? 'dark' : 'light');
+      };
+      mediaQuery.addEventListener('change', listener);
     }
+
+    return () => {
+      if (mediaQuery && listener) {
+        mediaQuery.removeEventListener('change', listener);
+      }
+    };
   }, [theme]);
 
   return (

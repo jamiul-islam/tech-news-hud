@@ -25,6 +25,8 @@ NEXT_PUBLIC_DEFAULT_TWITTER_HANDLE=     @your_profile_name
 
 NEXT_PUBLIC_X_BEARER_TOKEN=             your_x_api_bearer_token
 CRON_SECRET=                            optional_shared_secret_for_cron
+
+GEMINI_API_KEY=                         optional_default_key (leave blank for user-supplied)
 ```
 
 1. Install dependencies and start the dev server:
@@ -63,6 +65,12 @@ Both ingestion workers prune items older than 30 days and keep at most ~300 reco
    - `*/10 * * * *` → `/api/cron/rss`
    - `*/20 * * * *` → `/api/cron/x`
 3. Set the `x-cron-secret` header (or Bearer token) for each cron job to match `CRON_SECRET`.
+
+### AI Summaries (Gemini)
+
+- Users can paste their Gemini API key in the HUD (Focus controls → Gemini section). Keys are stored per profile in Supabase and never exposed client-side once saved.
+- Summaries are generated on demand via `/api/ai/summarize`, cached in `items.metadata.ai_summary`, and refreshed when requested again.
+- Require billing-enabled Gemini project; the front end will prompt users without a stored key.
 
 > **Heads up:** the provided X bearer token is very low throughput (1 timeline request per 15 minutes). When the limit is hit the HUD shows a toast and the `jobs` table records a `rate_limited` entry with the retry-after timestamp.
 

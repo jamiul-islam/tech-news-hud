@@ -163,6 +163,8 @@ export async function GET(req: NextRequest) {
         : undefined;
 
     const tweetId = typeof md['tweetId'] === 'string' ? (md['tweetId'] as string) : undefined;
+    const aiSummary = typeof md['ai_summary'] === 'string' ? (md['ai_summary'] as string) : undefined;
+    const aiSummaryUpdatedAt = typeof md['ai_summary_updated_at'] === 'string' ? (md['ai_summary_updated_at'] as string) : undefined;
 
     return {
       id: row.id,
@@ -182,6 +184,8 @@ export async function GET(req: NextRequest) {
       tweetMetrics,
       tweetId,
       tweetUsername: username,
+      aiSummary,
+      aiSummaryUpdatedAt,
     };
   });
 

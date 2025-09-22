@@ -52,6 +52,7 @@ interface AppActions {
   removeSource: (sourceId: string) => void;
   setSourcesStatus: (status: FetchState, error?: string) => void;
   setFeedItems: (items: FeedItem[], options?: { append?: boolean }) => void;
+  updateFeedItem: (itemId: string, patch: Partial<FeedItem>) => void;
   setFeedNextCursor: (cursor: string | null) => void;
   setFeedStatus: (status: FetchState) => void;
   toggleAutoScroll: (value?: boolean) => void;
@@ -166,9 +167,18 @@ export const useAppStore = create<AppState & AppActions>()(
             feed: {
               ...state.feed,
               items,
-            },
+              },
           };
         }),
+      updateFeedItem: (itemId, patch) =>
+        set((state) => ({
+          feed: {
+            ...state.feed,
+            items: state.feed.items.map((item) =>
+              item.id === itemId ? { ...item, ...patch } : item,
+            ),
+          },
+        })),
       setFeedNextCursor: (cursor) =>
         set((state) => ({
           feed: {

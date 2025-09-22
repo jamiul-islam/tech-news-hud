@@ -58,8 +58,7 @@
 - [x] Implement per-source item retention (30-day window + max 300 items) to keep Supabase storage bounded.
 
 ### 3.3 Scheduler Options
-- [ ] **GitHub Actions:** run `curl` against `rss-fetch` every 10 minutes and `twitter-fetch` every 15 minutes using repo secrets (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
-- [ ] **Vercel Cron:** add proxy API routes (`/api/cron/rss`, `/api/cron/x`) that forward to Supabase with the service key, then configure Vercel Cron at the desired cadence.
+- [x] **Vercel Cron:** use `/api/cron/rss` and `/api/cron/x` (protected by `CRON_SECRET`) and configure Vercel Cron at the desired cadence (`*/10 * * * *` and `*/20 * * * *`).
 - [ ] **Supabase pg_cron (future):** once enabled, replace the external scheduler with a Postgres cron job calling the edge functions via `pg_net`.
 
 ## 4. Frontend (App Router + Zustand)
@@ -98,9 +97,10 @@
 - [x] Add toast confirmations and snooze CTA.
 
 ### 4.7 Optional AI Settings
-- [ ] Create modal allowing user to store OpenAI/Gemini API keys.
-- [ ] Persist to Supabase `ai_settings` via preferences API.
-- [ ] Stub summarization toggle UI.
+- [x] Allow users to store a Gemini API key (gated via secured API endpoint).
+- [x] Persist key and preferences in Supabase without exposing secrets to the client.
+- [x] Generate on-demand AI summaries with Gemini and cache in feed metadata.
+- [ ] Add modal/expanded UI for managing multiple providers (OpenAI, etc.).
 
 ## 5. Testing & QA
 - [ ] Configure Jest/Playwright (or Cypress) for component and e2e tests.

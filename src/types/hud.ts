@@ -35,6 +35,8 @@ export interface FeedItem {
     replyCount?: number;
     quoteCount?: number;
   };
+  aiSummary?: string;
+  aiSummaryUpdatedAt?: string;
 }
 
 export interface FocusPreferences {
