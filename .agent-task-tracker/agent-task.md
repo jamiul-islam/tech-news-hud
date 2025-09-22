@@ -55,6 +55,12 @@
 - [x] Normalize tweets into `items` table with engagement metrics.
 - [x] Handle rate-limit retries with exponential backoff; confirm via MCP-deployed worker logs (when available).
 - [ ] Add mocked tests around normalization.
+- [x] Implement per-source item retention (30-day window + max 300 items) to keep Supabase storage bounded.
+
+### 3.3 Scheduler Options
+- [ ] **GitHub Actions:** run `curl` against `rss-fetch` every 10 minutes and `twitter-fetch` every 15 minutes using repo secrets (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
+- [ ] **Vercel Cron:** add proxy API routes (`/api/cron/rss`, `/api/cron/x`) that forward to Supabase with the service key, then configure Vercel Cron at the desired cadence.
+- [ ] **Supabase pg_cron (future):** once enabled, replace the external scheduler with a Postgres cron job calling the edge functions via `pg_net`.
 
 ## 4. Frontend (App Router + Zustand)
 ### 4.1 Global Layout & Theme

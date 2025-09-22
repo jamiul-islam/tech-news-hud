@@ -14,14 +14,16 @@ An AI‑powered HUD for tracking the latest tech news. Users can add RSS feeds o
 1. Create `.env.local` with Supabase credentials:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_database_url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-SUPABASE_PROJECT_REF=your_supabase_project reference
-NEXT_PUBLIC_DEFAULT_RSS=a_link_to_rss
-NEXT_PUBLIC_DEFAULT_TWITTER_HANDLE=@your_profile_name
-NEXT_PUBLIC_X_BEARER_TOKEN=your_x_api_bearer_token
+NEXT_PUBLIC_SUPABASE_URL=               your_supabase_database_url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=   your_supabase_publishable_key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=          your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=              your_supabase_service_role_key
+SUPABASE_PROJECT_REF=                   your_supabase_project_reference
+
+NEXT_PUBLIC_DEFAULT_RSS=                a_link_to_rss
+NEXT_PUBLIC_DEFAULT_TWITTER_HANDLE=     @your_profile_name
+
+NEXT_PUBLIC_X_BEARER_TOKEN=             your_x_api_bearer_token
 ```
 
 1. Install dependencies and start the dev server:
@@ -45,6 +47,8 @@ Associated Edge Functions (Supabase)
 
 - `rss-fetch` — fetches/parses RSS, dedupes, classifies topics, logs jobs
 - `twitter-fetch` — resolves handles to user IDs, pulls the latest 5 tweets, stores metrics, and logs rate-limit errors
+
+Both ingestion workers prune items older than 30 days and keep at most ~300 records per source so the Supabase database remains lightweight.
 
 > **Heads up:** the provided X bearer token is very low throughput (1 timeline request per 15 minutes). When the limit is hit the HUD shows a toast and the `jobs` table records a `rate_limited` entry with the retry-after timestamp.
 
