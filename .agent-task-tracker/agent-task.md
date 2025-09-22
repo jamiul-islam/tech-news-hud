@@ -84,6 +84,7 @@
 - [x] Implement auto-scroll banner cycling 2 focus-heavy + 1 popularity-heavy item.
 - [x] Pause auto-scroll on hover/manual scroll using Zustand state.
 - [x] Add skeleton loaders for initial fetch.
+- [x] Add cursor-based pagination with "Load older stories" control in the HUD stream.
 
 ### 4.6 Controls & Bookmarks
 - [x] Build `FocusControls` slider component adjusting focus/popularity mix.
@@ -103,11 +104,11 @@
 - [ ] Document known gaps + manual QA checklist in `/docs/testing.md`.
 
 ## 6. Deployment Pipeline
-- [ ] Configure Vercel project linked to repo; set environment variables (Supabase keys, API URLs).
-- [ ] Add preview deployments per branch; enforce `npm run build` (or `bun run build`) in CI.
-- [ ] Set up Supabase production project; run migrations via MCP (`apply_migration`) and verify schema.
-- [ ] Configure cron/Edge functions in production environment.
-- [ ] Smoke test production HUD (login, add source, view feed, bookmark).
+- [x] Configure Vercel project linked to repo; set environment variables (Supabase keys, API URLs).
+- [x] Add preview deployments per branch; enforce `npm run build` (or `bun run build`) in CI.
+- [x] Set up Supabase production project; run migrations via MCP (`apply_migration`) and verify schema.
+- [x] Configure cron/Edge functions in production environment.
+- [x] Smoke test production HUD (login, add source, view feed, bookmark).
 
 ## 7. Launch Checklist
 - [ ] Ensure default curated sources toggled on for new users (cold-start mitigation).

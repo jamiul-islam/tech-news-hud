@@ -30,19 +30,22 @@ export const SourceManager = () => {
   const removeSource = useAppStore((state) => state.removeSource);
   const setFeedItems = useAppStore((state) => state.setFeedItems);
   const setFeedStatus = useAppStore((state) => state.setFeedStatus);
+  const setFeedNextCursor = useAppStore((state) => state.setFeedNextCursor);
   const focusWeight = useAppStore((state) => state.preferences.focusWeight);
 
   const refreshFeed = async () => {
     try {
       setFeedStatus('loading');
-      const res = await fetch(`/api/feed?limit=50&mixRatio=${focusWeight.toFixed(2)}`, { cache: 'no-store' });
+      const res = await fetch(`/api/feed?limit=15&mixRatio=${focusWeight.toFixed(2)}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load feed');
       const data = await res.json();
       setFeedItems(data.items ?? []);
+      setFeedNextCursor(data.nextCursor ?? null);
       setFeedStatus('success');
     } catch (err) {
       console.warn('Failed to refresh feed', err);
       setFeedStatus('error');
+      setFeedNextCursor(null);
     }
   };
 

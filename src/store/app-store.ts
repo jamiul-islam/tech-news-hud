@@ -26,6 +26,7 @@ interface FeedState {
   items: FeedItem[];
   status: FetchState;
   autoScrollActive: boolean;
+  nextCursor: string | null;
 }
 
 type PreferencesState = FocusPreferences;
@@ -50,7 +51,8 @@ interface AppActions {
   upsertSource: (source: Source) => void;
   removeSource: (sourceId: string) => void;
   setSourcesStatus: (status: FetchState, error?: string) => void;
-  setFeedItems: (items: FeedItem[]) => void;
+  setFeedItems: (items: FeedItem[], options?: { append?: boolean }) => void;
+  setFeedNextCursor: (cursor: string | null) => void;
   setFeedStatus: (status: FetchState) => void;
   toggleAutoScroll: (value?: boolean) => void;
   updatePreferences: (prefs: Partial<PreferencesState>) => void;
@@ -80,6 +82,7 @@ const initialState: AppState = {
     items: [],
     status: 'idle',
     autoScrollActive: true,
+    nextCursor: null,
   },
   preferences: defaultPreferences,
   bookmarks: {
@@ -140,9 +143,38 @@ export const useAppStore = create<AppState & AppActions>()(
             error,
           },
         })),
-      setFeedItems: (items) =>
+      setFeedItems: (items, options) =>
+        set((state) => {
+          if (options?.append) {
+            const existing = state.feed.items;
+            const existingIds = new Set(existing.map((item) => item.id));
+            const merged = [...existing];
+            for (const item of items) {
+              if (!existingIds.has(item.id)) {
+                merged.push(item);
+              }
+            }
+            return {
+              feed: {
+                ...state.feed,
+                items: merged,
+              },
+            };
+          }
+
+          return {
+            feed: {
+              ...state.feed,
+              items,
+            },
+          };
+        }),
+      setFeedNextCursor: (cursor) =>
         set((state) => ({
-          feed: { ...state.feed, items },
+          feed: {
+            ...state.feed,
+            nextCursor: cursor,
+          },
         })),
       setFeedStatus: (status) =>
         set((state) => ({

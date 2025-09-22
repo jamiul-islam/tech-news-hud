@@ -153,6 +153,7 @@ type BookmarkRow = {
   const sources = useAppStore((state) => state.sources.items);
   const setSources = useAppStore((state) => state.setSources);
   const setFeedItems = useAppStore((state) => state.setFeedItems);
+  const setFeedNextCursor = useAppStore((state) => state.setFeedNextCursor);
   const setSourcesStatus = useAppStore((state) => state.setSourcesStatus);
   const setFeedStatus = useAppStore((state) => state.setFeedStatus);
   const setBookmarkEntries = useAppStore((state) => state.setBookmarkEntries);
@@ -244,10 +245,11 @@ type BookmarkRow = {
               setSourcesStatus('success');
               // Fetch feed for these sources
               setFeedStatus('loading');
-              const feedRes = await fetch(`/api/feed?limit=30&mixRatio=${focusWeight.toFixed(2)}`, { cache: 'no-store' });
+              const feedRes = await fetch(`/api/feed?limit=15&mixRatio=${focusWeight.toFixed(2)}`, { cache: 'no-store' });
               if (feedRes.ok) {
                 const feed = await feedRes.json();
                 setFeedItems(feed.items ?? []);
+                setFeedNextCursor(feed.nextCursor ?? null);
                 setFeedStatus('success');
                 await fetchAccountData();
                 return;
@@ -256,6 +258,7 @@ type BookmarkRow = {
             // If authenticated but no sources, show empty state (do not fallback)
             setSourcesStatus('success');
             setFeedStatus('success');
+            setFeedNextCursor(null);
             await fetchAccountData();
             return;
           }
@@ -267,6 +270,7 @@ type BookmarkRow = {
           setSources(demoSources);
           setSourcesStatus('success');
           setFeedItems(demoItems);
+          setFeedNextCursor(null);
           setFeedStatus('success');
           setBookmarkEntries(
             demoItems
@@ -280,7 +284,7 @@ type BookmarkRow = {
       }
     }
     bootstrap();
-  }, [fetchAccountData, focusWeight, setFeedItems, setFeedStatus, setSources, setSourcesStatus, setBookmarkEntries, sources.length]);
+  }, [fetchAccountData, focusWeight, setFeedItems, setFeedNextCursor, setFeedStatus, setSources, setSourcesStatus, setBookmarkEntries, sources.length]);
 
   return (
     <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-10">

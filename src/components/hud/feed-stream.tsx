@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { pushToast } from '@/store/toast-store';
 import { Card } from '@/components/ui/card';
 import { formatDistanceToNow } from '@/lib/utils/time';
+import type { FeedItem } from '@/types/hud';
 
 const EmptyFeed = () => (
   <div className="rounded-3xl border border-dashed border-[#1f1f1f]/15 dark:border-[#f5f5f5]/20 bg-white/70 dark:bg-[#111]/70 p-10 text-center text-sm text-[#0F0F0F]/70 dark:text-[#F8F8F8]/70">
@@ -26,8 +27,14 @@ export const FeedStream = () => {
   const items = useAppStore((state) => state.feed.items);
   const status = useAppStore((state) => state.feed.status);
   const setFeedItems = useAppStore((state) => state.setFeedItems);
+  const setFeedNextCursor = useAppStore((state) => state.setFeedNextCursor);
   const upsertBookmark = useAppStore((state) => state.upsertBookmark);
   const removeBookmark = useAppStore((state) => state.removeBookmark);
+  const nextCursor = useAppStore((state) => state.feed.nextCursor);
+  const focusWeight = useAppStore((state) => state.preferences.focusWeight);
+
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -75,6 +82,35 @@ export const FeedStream = () => {
         pushToast('Bookmark removal failed', 'error');
         console.warn('Failed to delete bookmark', error);
       }
+    }
+  };
+
+  const loadOlderStories = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setLoadError(null);
+    try {
+      const params = new URLSearchParams({
+        limit: '15',
+        before: nextCursor,
+        mixRatio: focusWeight.toFixed(2),
+      });
+      const res = await fetch(`/api/feed?${params.toString()}`, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error('Failed to load older stories');
+      }
+      const data = await res.json();
+      const newItems: FeedItem[] = Array.isArray(data?.items) ? (data.items as FeedItem[]) : [];
+      if (newItems.length > 0) {
+        setFeedItems(newItems, { append: true });
+      }
+      setFeedNextCursor(data?.nextCursor ?? null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load older stories';
+      setLoadError(message);
+      console.warn('Pagination load failed', error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -182,6 +218,18 @@ export const FeedStream = () => {
           </div>
         </Card>
       ))}
+      {loadError && (
+        <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+          {loadError}
+        </div>
+      )}
+      {nextCursor && (
+        <div className="flex justify-center">
+          <Button variant="ghost" onClick={loadOlderStories} disabled={loadingMore}>
+            {loadingMore ? 'Loading…' : 'Load older stories'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

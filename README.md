@@ -7,6 +7,8 @@ An AI‑powered HUD for tracking the latest tech news. Users can add RSS feeds o
 <!-- markdownlint-disable-next-line MD033 -->
 <img src="./public/app-screenshot.png" alt="App UI Screenshot" width="100%" />
 
+- Cursor-based pagination keeps the HUD calm—tap “Load older stories” to backfill more signal without overwhelming the page.
+
 ## Quick Start
 
 1. Create `.env.local` with Supabase credentials:
