@@ -24,6 +24,7 @@ NEXT_PUBLIC_DEFAULT_RSS=                a_link_to_rss
 NEXT_PUBLIC_DEFAULT_TWITTER_HANDLE=     @your_profile_name
 
 NEXT_PUBLIC_X_BEARER_TOKEN=             your_x_api_bearer_token
+CRON_SECRET=                            optional_shared_secret_for_cron
 ```
 
 1. Install dependencies and start the dev server:
@@ -49,6 +50,19 @@ Associated Edge Functions (Supabase)
 - `twitter-fetch` — resolves handles to user IDs, pulls the latest 5 tweets, stores metrics, and logs rate-limit errors
 
 Both ingestion workers prune items older than 30 days and keep at most ~300 records per source so the Supabase database remains lightweight.
+
+### Scheduled Refresh (Vercel Cron)
+
+- `GET /api/cron/rss` — triggers the RSS edge function; requires the `x-cron-secret` header when `CRON_SECRET` is set.
+- `GET /api/cron/x` — triggers the Twitter edge function; same optional secret requirement.
+
+**Configure on Vercel**
+
+1. Add `CRON_SECRET` to Vercel project environment variables (alongside the Supabase keys).
+2. In *Settings → Cron Jobs*, create:
+   - `*/10 * * * *` → `/api/cron/rss`
+   - `*/20 * * * *` → `/api/cron/x`
+3. Set the `x-cron-secret` header (or Bearer token) for each cron job to match `CRON_SECRET`.
 
 > **Heads up:** the provided X bearer token is very low throughput (1 timeline request per 15 minutes). When the limit is hit the HUD shows a toast and the `jobs` table records a `rate_limited` entry with the retry-after timestamp.
 
