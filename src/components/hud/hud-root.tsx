@@ -331,9 +331,9 @@ type BookmarkRow = {
               Coming soon
             </p>
             <ul className="mt-3 space-y-2 text-sm">
-              <li>• Bring your own OpenAI or Gemini key for summaries.</li>
               <li>• Shared focus profiles for teams.</li>
-              <li>• Semantic clustering to avoid duplicates.</li>
+              <li>• Deeper Twitter integration (DMs, lists, etc.).</li>
+              <li>• Mobile app and push notifications.</li>
             </ul>
           </div>
         </div>
