@@ -38,6 +38,35 @@ npm run dev
 
 App runs at [http://localhost:3000](http://localhost:3000)
 
+## System Diagram
+
+```
+┌────────────┐     add/remove sources      ┌──────────────────┐
+│  Browser   │ ───────────────────────────►│ Next.js API Layer│
+│  HUD UI    │◄──────── feed/items ────────┤  (App Router)    │
+└─────▲──────┘                             └────────┬─────────┘
+      │   trigger cron via Vercel / user actions    │
+      │                                             │ async HTTP (service role)
+      │                                             |
+      │                                   ┌─────────▼────────┐
+      │                                   │ Supabase Edge    │
+      │                                   │ Functions        │
+      │                                   │  • rss-fetch     │
+      │                                   │  • twitter-fetch │
+      │                                   └────────┬─────────┘
+      │                                            │ 
+      │                                            | SQL upsert / jobs log
+      |                                            |
+      │                                   ┌────────▼──────────┐
+      │                                   │ Supabase Postgres │
+      └───────────────────────────────────│ tables            │
+                                          │  • profiles       │
+                                          │  • sources        │
+                                          │  • items          │
+                                          │  • jobs           │
+                                          └───────────────────┘
+```
+
 ## API Routes
 
 - `POST /api/sources` — validate + insert RSS/X source, enqueue job, trigger ingestion
